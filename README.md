@@ -16,10 +16,11 @@ Personal playlists can be used too, as long as they are made publicly visible.
 0. The script should now the HTML of the Apple Music playlists, 
 
 ## Note
-This script is very basic and quite unfinished. I have not put much -if any- time into optimization (e.g. async execution).
+I tested the script on Windows 11, however I don't think I used any platform-specific code. So Linux and Mac likely work fine, too!
 
+The code is very basic and quite unfinished. I have not put much -if any- time into optimization (e.g. async execution).
 
 Use at your own risk and feel free to adjust to your own preference.
 
-This is my first project to be published on GitHub and I take it as an opportunity to learn about Git :D
+This is my first project to be published on GitHub and I take it as an opportunity to learn about Git and GitHub :D
 I'm happy about any and all recommendations on how I can improve this repo!
