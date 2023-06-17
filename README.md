@@ -15,6 +15,9 @@ Personal playlists can be used too, as long as they are made publicly visible.
 0. The script should now create a file called `tekore.cfg` in the working directory. This file will from now on be used for automatic authentication.
 0. The script should now the HTML of the Apple Music playlists, 
 
+If you want to keep changes in the `config.py` when updating using `git pull`, rename the file to `config_dev.py`. This file is added to `.gitignore` so that changes to it will not be overridden/synced.
+If `config_dev.py` is present, `config.py` will be ignored by the script.
+
 ## Note
 I tested the script on Windows 11, however I don't think I used any platform-specific code. So Linux and Mac likely work fine, too!
 

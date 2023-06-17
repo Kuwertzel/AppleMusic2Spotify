@@ -1,2 +1,4 @@
 tekore.cfg
+config_dev.py
 __pycache__/
+.idea/

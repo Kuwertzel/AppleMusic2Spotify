@@ -4,8 +4,10 @@ import mechanicalsoup
 from dataclasses import dataclass
 import tekore as tk
 
-from config import applemusic_playlist_urls
-
+try:
+    from config_dev import applemusic_playlist_urls
+except ImportError:
+    from config import applemusic_playlist_urls
 
 # --- Spotify authentication ---------------------------
 # generate token if tekore.cfg does not exist
@@ -23,6 +25,7 @@ conf = tk.config_from_file('tekore.cfg', return_refresh=True)
 user_token = tk.refresh_user_token(*conf[:2], conf[3])
 
 spotify = tk.Spotify(user_token)
+
 
 # --- Apple Music objects ------------------------------
 
@@ -60,6 +63,7 @@ class AppleMusicPlaylist:
             author=playlist_dict[0]['data']['seoData']['schemaContent']['author']['name'],
             tracks=tracks,
         )
+
 
 # --- Apple Music --------------------------------------
 
@@ -162,9 +166,11 @@ print('Adding tracks to all playlists')
 for applemusic_playlist in applemusic_playlists.values():
     spotify_playlist = applemusic_spotify_matches[applemusic_playlist.id]
 
-    print(f"collecting tracks for '{applemusic_playlist.name}':")
+    print(f"\ncollecting tracks for '{applemusic_playlist.name}':")
     track_uris = []
     for applemusic_track in applemusic_playlist.tracks:
+        track_found = False
+
         # find track by searching for each of the queries if the previus did not yield a result
         track_search_queries = [
             f'track:{applemusic_track.title} artist:{applemusic_track.artist}',
@@ -172,14 +178,24 @@ for applemusic_playlist in applemusic_playlists.values():
             f'{applemusic_track.artist} track:{applemusic_track.title}',
         ]
         for track_search_query in track_search_queries:
-            found_tracks = spotify.search(query=track_search_query, types=('track',), limit=1)[0].items
+            if track_found: break
+
+            found_tracks = spotify.search(query=track_search_query, types=('track',), limit=5)[0].items
             if len(found_tracks) != 0:
-                print(f"  search for '{track_search_query}' found: {found_tracks[0].name} by {found_tracks[0].artists[0].name} ({found_tracks[0].uri})")
-                track_uris.append(found_tracks[0].uri)
-                break
+                for found_track in found_tracks:
+                    if found_track.name == applemusic_track.title:
+                        print(f"  ✅ search for '{track_search_query}' found exact match: {found_track.name} by {found_track.artists[0].name} ({found_track.uri})")
+                        track_uris.append(found_track.uri)
+                        track_found = True
+                        break
+                else:
+                    print(f"  ⚠️search for '{track_search_query}' found similar match: {found_tracks[0].name} by {found_tracks[0].artists[0].name} ({found_tracks[0].uri})")
+                    track_uris.append(found_tracks[0].uri)
+                    track_found = True
+                    break
+
         else:
-            print(
-                f"  track could not be found using any of the queries. ({track_search_queries})")
+            print(f"  ❌ track could not be found using any of the queries. ({track_search_queries})")
 
     # add tracks to the playlist (max 100 per API call)
     print(f'  → adding {len(track_uris)} tracks...')
