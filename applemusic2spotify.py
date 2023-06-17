@@ -242,8 +242,8 @@ for applemusic_playlist in applemusic_playlists.values():
 
     # add tracks to the playlist (max 100 per API call)
     print(f'  → adding {len(track_uris)} tracks...')
-    # spotify.playlist_clear(spotify_playlist.id)
-    # for i in range(0, len(track_uris), 100):
-    #     spotify.playlist_add(spotify_playlist.id, track_uris[i:i + 100])
+    spotify.playlist_clear(spotify_playlist.id)
+    for i in range(0, len(track_uris), 100):
+        spotify.playlist_add(spotify_playlist.id, track_uris[i:i + 100])
 
 print('DONE')
