@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import mechanicalsoup
 from dataclasses import dataclass
 import tekore as tk
@@ -28,17 +29,50 @@ spotify = tk.Spotify(user_token)
 
 
 # --- Apple Music objects ------------------------------
+def split_artists(artist_string):
+    # Split the artist string by "&" or ","
+    artist_names = re.split(r'[&|,]', artist_string)
+
+    # Strip whitespace from each artist name
+    cleaned_names = [name.strip() for name in artist_names]
+
+    return cleaned_names
+
+
+def extract_artists(track_name):
+    # Define the pattern to match multiple artists within parentheses
+    pattern = r'\(feat\. ([^)]+)\)'
+
+    # Find all matches using regular expression
+    matches = re.findall(pattern, track_name)
+
+    artists = []
+
+    for match in matches:
+        # Split and clean the matched artist names
+        artist_names = split_artists(match)
+        artists.extend(artist_names)
+
+    # Remove the artist names from the track name
+    clean_track_name = re.sub(pattern, '', track_name).strip()
+
+    return clean_track_name, artists
+
 
 @dataclass
 class AppleMusicTrack:
     title: str
-    artist: str
+    artists: list[str]
 
     @classmethod
     def from_dict(cls, track_dict):
+        artists = split_artists(track_dict['artistName'])  # split several artists by '&' and ','
+        clean_title, featuring_artists = extract_artists(track_dict['title'])  # filter the track title for 'sometitle (feat. ARTIST NAME)'
+        artists.extend(featuring_artists)
+        artists = list(dict.fromkeys(artists))    # remove possible duplicate artists while keeping the original order
         return cls(
-            title=track_dict['title'],
-            artist=track_dict['artistName'],
+            title=clean_title,
+            artists=artists,
         )
 
 
@@ -55,7 +89,6 @@ class AppleMusicPlaylist:
         tracks = []
         for track_dict in playlist_dict[0]['data']['sections'][1]['items']:
             tracks.append(AppleMusicTrack.from_dict(track_dict))
-
         return cls(
             id=playlist_dict[0]['data']['seoData']['appleContentId'],
             url=playlist_dict[0]['data']['canonicalURL'],
@@ -170,37 +203,47 @@ for applemusic_playlist in applemusic_playlists.values():
     track_uris = []
     for applemusic_track in applemusic_playlist.tracks:
         track_found = False
+        fallback_track = None
 
         # find track by searching for each of the queries if the previus did not yield a result
         track_search_queries = [
-            f'track:{applemusic_track.title} artist:{applemusic_track.artist}',
-            f'{applemusic_track.title} - {applemusic_track.artist}',
-            f'{applemusic_track.artist} track:{applemusic_track.title}',
+            f'track:{applemusic_track.title} artist:{" ".join(applemusic_track.artists)}',  # title:TITLE artist:ARTIST1 ARTIST2 ...
+            f'{applemusic_track.title} - {" ".join(applemusic_track.artists)}',  # TITLE - ARTIST1 ARTIST2 ...
+            f'{applemusic_track.artists[0]} track:{applemusic_track.title}',  # ARTIST1 track:TITLE
         ]
         for track_search_query in track_search_queries:
-            if track_found: break
+            if track_found:
+                break
 
+            # search for the first five matching tracks
             found_tracks = spotify.search(query=track_search_query, types=('track',), limit=5)[0].items
             if len(found_tracks) != 0:
                 for found_track in found_tracks:
-                    if found_track.name == applemusic_track.title:
-                        print(f"  ✅ search for '{track_search_query}' found exact match: {found_track.name} by {found_track.artists[0].name} ({found_track.uri})")
+                    # add track if the name (without feat. ...) matches precisely
+                    clean_track_name = re.sub(r'\(feat\. ([^)]+)\)', '', found_track.name).strip()
+                    if clean_track_name.lower() == applemusic_track.title.lower():
+                        print(f"  🟢 search for '{track_search_query}' found exact match: {found_track.name} by {found_track.artists[0].name} ({found_track.uri})")
                         track_uris.append(found_track.uri)
                         track_found = True
                         break
                 else:
-                    print(f"  ⚠️search for '{track_search_query}' found similar match: {found_tracks[0].name} by {found_tracks[0].artists[0].name} ({found_tracks[0].uri})")
-                    track_uris.append(found_tracks[0].uri)
-                    track_found = True
-                    break
+                    # store first result as fallback in case no precise result is found using the other search queries either
+                    if not fallback_track:
+                        fallback_track = found_tracks[0]
 
         else:
-            print(f"  ❌ track could not be found using any of the queries. ({track_search_queries})")
+            if fallback_track:
+                track_found = True
+                # if none of the found track names matched precisely, add the first result
+                print(f"  🟡 search for '{track_search_queries[0]}' found similar match: {fallback_track.name} by {fallback_track.artists[0].name} ({fallback_track.uri})")
+                track_uris.append(fallback_track.uri)
+            else:
+                print(f"  🔴 track could not be found using any of the following queries: {track_search_queries}")
 
     # add tracks to the playlist (max 100 per API call)
     print(f'  → adding {len(track_uris)} tracks...')
-    spotify.playlist_clear(spotify_playlist.id)
-    for i in range(0, len(track_uris), 100):
-        spotify.playlist_add(spotify_playlist.id, track_uris[i:i + 100])
+    # spotify.playlist_clear(spotify_playlist.id)
+    # for i in range(0, len(track_uris), 100):
+    #     spotify.playlist_add(spotify_playlist.id, track_uris[i:i + 100])
 
 print('DONE')
