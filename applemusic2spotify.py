@@ -40,8 +40,8 @@ def split_artists(artist_string):
 
 
 def extract_artists(track_name):
-    # Define the pattern to match multiple artists within parentheses
-    pattern = r'\(feat\. ([^)]+)\)'
+    # Define the pattern to match multiple artists within parentheses or brackets
+    pattern = r'\[(feat\.|ft\.|featuring) ([^]]+)\]|\(feat\. ([^)]+)\)'
 
     # Find all matches using regular expression
     matches = re.findall(pattern, track_name)
@@ -49,8 +49,14 @@ def extract_artists(track_name):
     artists = []
 
     for match in matches:
-        # Split and clean the matched artist names
-        artist_names = split_artists(match)
+        # Find the index of the non-empty group in the match
+        index = next((i for i, grp in enumerate(match) if grp), None)
+
+        # Extract the artist names from the match
+        artist_string = match[index]
+
+        # Split and clean the artist names
+        artist_names = split_artists(artist_string)
         artists.extend(artist_names)
 
     # Remove the artist names from the track name
