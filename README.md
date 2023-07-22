@@ -41,3 +41,5 @@ I'm happy about any and all recommendations on how I can improve this repo!
 - [ ] extend extract_artists function to also parse square brackets eg. `[feat. Sean Paul & Anne-Marie]`
 - [ ] create get_clean_title function
 - [ ] add "... (with ARTIST)" to get_clean_title function
+
+I might never implement the above mentioned changes since I have moved on to other projects for now.
