@@ -5,7 +5,6 @@ import requests
 import mechanicalsoup
 from dataclasses import dataclass
 import tekore as tk
-from pprint import pprint
 
 try:
     from config_dev import applemusic_playlist_urls
