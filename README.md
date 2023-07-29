@@ -1,6 +1,6 @@
 # AppleMusic2Spotify
 
-This script can read public Apple Music playlists and create a mirrored playlists on Spotify.
+This script can read public Apple Music playlists and create mirrored playlists on Spotify.
 
 Personal playlists can be used too, as long as they are made publicly visible.
 
@@ -33,14 +33,12 @@ The code is very basic and partially unfinished. I have not put much time into o
 
 Use at your own risk and feel free to adjust to your own preference.
 
-This is my first project to be published on GitHub and I take it as an opportunity to learn about Git and GitHub :D
+This is my first proper project to be published on GitHub and I take it as an opportunity to learn about Git and GitHub :D
 I'm happy about any and all recommendations on how I can improve this repo!
 
 ## TO-DOs
 
-- [ ] extend extract_artists function to also parse square brackets eg. `[feat. Sean Paul & Anne-Marie]`
-- [ ] create get_clean_title function
-- [ ] add "... (with ARTIST)" to get_clean_title function
-- [ ] load more than the first ~300 tracks from Apple Music. This will most likely require the use of selenium to scroll down for additional tracks to load.
-
-I might never implement the above mentioned changes since I have moved on to other projects for now.
+- [x] create get_clean_title function
+- [x] add "... (with ARTIST)" to get_clean_title function
+- [x] load more than the first ~300 tracks from Apple Music. This will most likely require the use of selenium to scroll down for additional tracks to load.
+- [x] extend extract_artists function to also parse square brackets eg. `[feat. Sean Paul & Anne-Marie]`
