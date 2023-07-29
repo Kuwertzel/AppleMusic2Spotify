@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import requests
 import mechanicalsoup
 from dataclasses import dataclass
 import tekore as tk
@@ -28,7 +29,12 @@ user_token = tk.refresh_user_token(*conf[:2], conf[3])
 spotify = tk.Spotify(user_token)
 
 
-# --- Apple Music objects ------------------------------
+# --- Apple Music functions and objects ------------------------------
+def get_playlist_id_from_url(playlist_url: str):
+    # Example URL: https://music.apple.com/de/playlist/todays-hits/pl.f4d106fed2bd41149aaacabb233eb5eb
+    return playlist_url.rsplit('/', 1)[1]
+
+
 def split_artists(artist_string):
     # Split the artist string by "&" or ","
     artist_names = re.split(r'[&|,]', artist_string)
@@ -39,9 +45,16 @@ def split_artists(artist_string):
     return cleaned_names
 
 
+def remove_artists_from_track_name(dirty_track_name):
+    # !!! when the pattern is changed, it should also be updated accordingly inside the extract_artists function !!!
+    pattern = r'(?:\(|\[)(?:feat\.|ft\.|featuring) .*?(?:\]|\))'
+    return re.sub(pattern, '', dirty_track_name).strip()
+
+
 def extract_artists(track_name):
     # Define the pattern to match multiple artists within parentheses or brackets
-    pattern = r'\[(feat\.|ft\.|featuring) ([^]]+)\]|\(feat\. ([^)]+)\)'
+    # !!! when the pattern is changed, it should also be updated accordingly inside the remove_artists_from_track_name function !!!
+    pattern = r'(?:\(|\[)(?:feat\.|ft\.|featuring) (.*?)(?:\]|\))'
 
     # Find all matches using regular expression
     matches = re.findall(pattern, track_name)
@@ -49,20 +62,11 @@ def extract_artists(track_name):
     artists = []
 
     for match in matches:
-        # Find the index of the non-empty group in the match
-        index = next((i for i, grp in enumerate(match) if grp), None)
-
-        # Extract the artist names from the match
-        artist_string = match[index]
-
         # Split and clean the artist names
-        artist_names = split_artists(artist_string)
+        artist_names = split_artists(match)
         artists.extend(artist_names)
 
-    # Remove the artist names from the track name
-    clean_track_name = re.sub(pattern, '', track_name).strip()
-
-    return clean_track_name, artists
+    return remove_artists_from_track_name(track_name), artists
 
 
 @dataclass
@@ -72,10 +76,66 @@ class AppleMusicTrack:
 
     @classmethod
     def from_dict(cls, track_dict):
-        artists = split_artists(track_dict['artistName'])  # split several artists by '&' and ','
-        clean_title, featuring_artists = extract_artists(track_dict['title'])  # filter the track title for 'sometitle (feat. ARTIST NAME)'
+        # Example track dict:
+        # {
+        #   "id": "1485476561",
+        #   "type": "songs",
+        #   "href": "/v1/catalog/de/songs/1485476561",
+        #   "attributes": {
+        #     "hasTimeSyncedLyrics": true,
+        #     "albumName": "Tusa - Single",
+        #     "genreNames": [
+        #       "Latin Urban",
+        #       "Musik",
+        #       "Latin"
+        #     ],
+        #     "trackNumber": 1,
+        #     "releaseDate": "2019-11-07",
+        #     "durationInMillis": 200550,
+        #     "isVocalAttenuationAllowed": true,
+        #     "isMasteredForItunes": true,
+        #     "isrc": "USUM71921183",
+        #     "artwork": {
+        #       "width": 3000,
+        #       "url": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/61/a9/be/61a9beee-4172-624e-5f1b-8edb9e59dfe3/19UMGIM93544.rgb.jpg/{w}x{h}bb.jpg",
+        #       "height": 3000,
+        #       "textColor3": "e7deda",
+        #       "textColor2": "f2dce3",
+        #       "textColor4": "ddc2ce",
+        #       "textColor1": "fefef2",
+        #       "bgColor": "895c79",
+        #       "hasP3": false
+        #     },
+        #     "audioLocale": "es-ES",
+        #     "composerName": "KAROL G, Nicki Minaj, Daniel Echavarr\u00eda, Kevyn Mauricio Cruz Moreno & Juan Camilo Vargas",
+        #     "url": "https://music.apple.com/de/album/tusa/1485476559?i=1485476561",
+        #     "playParams": {
+        #       "id": "1485476561",
+        #       "kind": "song"
+        #     },
+        #     "discNumber": 1,
+        #     "hasCredits": false,
+        #     "hasLyrics": true,
+        #     "isAppleDigitalMaster": true,
+        #     "audioTraits": [
+        #       "atmos",
+        #       "lossless",
+        #       "lossy-stereo",
+        #       "spatial"
+        #     ],
+        #     "name": "Tusa",
+        #     "previews": [
+        #       {
+        #         "url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview112/v4/29/f6/f1/29f6f195-39d9-27c2-6ea6-9a1bb867eb0a/mzaf_18007481101280159061.plus.aac.ep.m4a"
+        #       }
+        #     ],
+        #     "artistName": "KAROL G & Nicki Minaj"
+        #   }
+        # },
+        artists = split_artists(track_dict['attributes']['artistName'])  # split several artists by '&' and ','
+        clean_title, featuring_artists = extract_artists(track_dict['attributes']['name'])  # filter the track title for 'sometitle (feat. ARTIST NAME)'
         artists.extend(featuring_artists)
-        artists = list(dict.fromkeys(artists))    # remove possible duplicate artists while keeping the original order
+        artists = list(dict.fromkeys(artists))  # remove possible duplicate artists while keeping the original order
         return cls(
             title=clean_title,
             artists=artists,
@@ -87,19 +147,17 @@ class AppleMusicPlaylist:
     id: str
     url: str
     name: str
-    author: str
     tracks: list[AppleMusicTrack]
 
     @classmethod
-    def from_dict(cls, playlist_dict):
+    def from_dict(cls, playlist_id, url, name, track_list):
         tracks = []
-        for track_dict in playlist_dict[0]['data']['sections'][1]['items']:
+        for track_dict in track_list:
             tracks.append(AppleMusicTrack.from_dict(track_dict))
         return cls(
-            id=playlist_dict[0]['data']['seoData']['appleContentId'],
-            url=playlist_dict[0]['data']['canonicalURL'],
-            name=playlist_dict[0]['data']['seoData']['schemaContent']['name'],
-            author=playlist_dict[0]['data']['seoData']['schemaContent']['author']['name'],
+            id=playlist_id,
+            url=url,
+            name=name,
             tracks=tracks,
         )
 
@@ -109,26 +167,45 @@ class AppleMusicPlaylist:
 
 print('Loading Apple Music playlists')
 
-# Create a MechanicalSoup browser object
-browser = mechanicalsoup.StatefulBrowser()
+BASE_API_URL = 'https://amp-api.music.apple.com'
+# The token below is hard-coded in a javascript file on the Apple Music website. It stays the same across several days, browsers and requesting IPs. Let's hope it won't change with future updates of Apple Music.
+BAERER_TOKEN = 'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IldlYlBsYXlLaWQifQ.eyJpc3MiOiJBTVBXZWJQbGF5IiwiaWF0IjoxNjkwNDA2ODM1LCJleHAiOjE2OTc2NjQ0MzUsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.seFShNhCiGuoj5qBOqECAoKBtKJF0wN-KaEj4HICJnExwXtnYabeb0jTSSrK1uez5b6XvYUOsx0pgARKm1AJQg'
+HEADERS = {
+    'Origin': 'https://music.apple.com',
+    'Authorization': f'Bearer {BAERER_TOKEN}'
+}
 
 applemusic_playlists = {}
+browser = mechanicalsoup.StatefulBrowser()
 for applemusic_playlist_url in applemusic_playlist_urls:
-    # Navigate to the webpage
     print(f'  {applemusic_playlist_url}', end='')
+
+    # Load playlist name, id etc.
     browser.open(applemusic_playlist_url)
-
-    # Find the script tag with id 'serialized-server-data'
     script_element = browser.page.select_one('#serialized-server-data')
+    playlist_name = browser.page.select_one('meta[name="apple:title"]').get_attribute_list('content')[0]
 
-    # Extract the innerHTML if the script tag is found
-    assert script_element
-    inner_html = script_element.decode_contents()
+    # Load tracks
+    playlist_id = get_playlist_id_from_url(applemusic_playlist_url)
+    url = f'{BASE_API_URL}/v1/catalog/de/playlists/{playlist_id}/tracks'
+    response = requests.request('GET', url, headers=HEADERS)
+    # print(f'GET:{response.url}')
+    response_json = json.loads(response.text)
+    assert 'data' in response_json
+    tracks: list = response_json['data']
+    # Load additional tracks if there are any
+    while 'next' in response_json:
+        print('.', end='')
+        response = requests.request('GET', BASE_API_URL + response_json['next'], headers=HEADERS)
+        # print(f'GET:{response.url}')
+        response_json = json.loads(response.text)
+        tracks.extend(response_json['data'])
 
-    data = json.loads(inner_html)
-    applemusic_playlist = AppleMusicPlaylist.from_dict(data)
+    # Create objects
+    applemusic_playlist = AppleMusicPlaylist.from_dict(playlist_id, applemusic_playlist_url, playlist_name, tracks)
     applemusic_playlists[applemusic_playlist.id] = applemusic_playlist
-    print(f" → '{applemusic_playlists[applemusic_playlist.id].name}' with {len(applemusic_playlists[applemusic_playlist.id].tracks)} tracks")
+
+    print(f" → '{applemusic_playlist.name}' with {len(applemusic_playlist.tracks)} tracks")
 
 browser.close()
 print('All Apple Music playlists loaded.')
@@ -226,7 +303,7 @@ for applemusic_playlist in applemusic_playlists.values():
             if len(found_tracks) != 0:
                 for found_track in found_tracks:
                     # add track if the name (without feat. ...) matches precisely
-                    clean_track_name = re.sub(r'\(feat\. ([^)]+)\)', '', found_track.name).strip()
+                    clean_track_name = remove_artists_from_track_name(found_track.name)
                     if clean_track_name.lower() == applemusic_track.title.lower():
                         print(f"  🟢 search for '{track_search_query}' found exact match: {found_track.name} by {found_track.artists[0].name} ({found_track.uri})")
                         track_uris.append(found_track.uri)
