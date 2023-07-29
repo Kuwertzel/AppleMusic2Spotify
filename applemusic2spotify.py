@@ -200,7 +200,7 @@ for applemusic_playlist_url in applemusic_playlist_urls:
     browser.open(applemusic_playlist_url)
     script_element = browser.page.select_one('#serialized-server-data')
     playlist_name = browser.page.select_one('meta[name="apple:title"]').get_attribute_list('content')[0]
-    playlist_author = browser.page.select_one('.headings__subtitles').decode_contents().strip()
+    playlist_author = browser.page.select_one('.headings__subtitles').text().strip()
 
     # Load tracks
     playlist_id = get_playlist_id_from_url(applemusic_playlist_url)
