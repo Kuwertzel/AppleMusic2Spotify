@@ -148,24 +148,10 @@ class AppleMusicPlaylist:
     id: str
     url: str
     name: str
-    author: str
     tracks: list[AppleMusicTrack]
 
-    # @classmethod
-    # def from_dict(cls, playlist_dict):
-    #     tracks = []
-    #     for track_dict in playlist_dict[0]['data']['sections'][1]['items']:
-    #         tracks.append(AppleMusicTrack.from_dict(track_dict))
-    #     return cls(
-    #         id=playlist_dict[0]['data']['seoData']['appleContentId'],
-    #         url=playlist_dict[0]['data']['canonicalURL'],
-    #         name=playlist_dict[0]['data']['seoData']['schemaContent']['name'],
-    #         author=playlist_dict[0]['data']['seoData']['schemaContent']['author']['name'],
-    #         tracks=tracks,
-    #     )
-
     @classmethod
-    def from_dict(cls, playlist_id, url, name, author, track_list):
+    def from_dict(cls, playlist_id, url, name, track_list):
         tracks = []
         for track_dict in track_list:
             tracks.append(AppleMusicTrack.from_dict(track_dict))
@@ -173,7 +159,6 @@ class AppleMusicPlaylist:
             id=playlist_id,
             url=url,
             name=name,
-            author=author,
             tracks=tracks,
         )
 
@@ -200,7 +185,6 @@ for applemusic_playlist_url in applemusic_playlist_urls:
     browser.open(applemusic_playlist_url)
     script_element = browser.page.select_one('#serialized-server-data')
     playlist_name = browser.page.select_one('meta[name="apple:title"]').get_attribute_list('content')[0]
-    playlist_author = browser.page.select_one('.headings__subtitles').decode_contents().strip()
 
     # Load tracks
     playlist_id = get_playlist_id_from_url(applemusic_playlist_url)
@@ -219,10 +203,10 @@ for applemusic_playlist_url in applemusic_playlist_urls:
         tracks.extend(response_json['data'])
 
     # Create objects
-    applemusic_playlist = AppleMusicPlaylist.from_dict(playlist_id, applemusic_playlist_url, playlist_name, playlist_author, tracks)
+    applemusic_playlist = AppleMusicPlaylist.from_dict(playlist_id, applemusic_playlist_url, playlist_name, tracks)
     applemusic_playlists[applemusic_playlist.id] = applemusic_playlist
 
-    print(f" → '{applemusic_playlist.name}' by {applemusic_playlist.author} with {len(applemusic_playlist.tracks)} tracks")
+    print(f" → '{applemusic_playlist.name}' with {len(applemusic_playlist.tracks)} tracks")
 
 browser.close()
 print('All Apple Music playlists loaded.')
