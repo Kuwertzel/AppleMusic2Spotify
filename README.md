@@ -7,7 +7,7 @@ Personal playlists can be used too, as long as they are made publicly visible.
 ## Setup
 
 1. Install a recent version of Python.
-2. Install the python modules tekore and mechanicalsoup.
+2. Install the python modules `requests`, `mechanicalsoup` and `tekore`, e.g. using `pip install -r requirements.txt`
 3. Follow [this guide](https://developer.spotify.com/documentation/web-api/concepts/apps) to register a new Spotify
    application using your Spotify account. Take note of the client ID, client secret and redirect URI.
 4. Download both `applemusic2spotify.py` and `config.py` or clone this repo.
