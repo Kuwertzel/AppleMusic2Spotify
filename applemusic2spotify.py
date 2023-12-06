@@ -14,7 +14,7 @@ except ImportError:
 # --- Spotify authentication ---------------------------
 # generate token if tekore.cfg does not exist
 if not os.path.isfile('tekore.cfg'):
-    print('tecore.cfg could not be found. This file is used to store the user authentication details for later use. Please input your API credentials to create the tecore.cfg file.')
+    print('tekore.cfg could not be found. This file is used to store the user authentication details for later use. Please input your API credentials to create the tekore.cfg file.')
     client_id = input('Spotify app client ID: ')
     client_secret = input('Spotify app client secret: ')
     redirect_uri = input('Spotify app redirect URI: ')
